@@ -3571,6 +3571,8 @@ function spawnFlowers() {
       model.scale.setScalar(scale);
       scene.add(model);
 
+      const colorName = hue === FLOWER_COLORS.red ? 'red' : hue === FLOWER_COLORS.blue ? 'blue' : 'white';
+
       const flower = {
         id: `flower_${String(flowerIndex++).padStart(3, '0')}`,
         x, z, groundY, phase: 3, regen: 0, claims: 0,
@@ -3588,6 +3590,7 @@ function spawnFlowers() {
         sway: Math.random() * Math.PI * 2,
         pulse: Math.random() * Math.PI * 2,
         flash: 0, hue, model,
+        color: colorName,
         vitality: 1, baseScale: scale, lastHarvestVitality: 1,
       };
       syncFlowerTier(flower, false);
@@ -4694,7 +4697,8 @@ function collectToolTarget(flower, boost) {
   flower.flash = 1;
   flower.harvestPop = 0.75;
   const gy = flower.groundY || 0;
-  spawnHarvestBurst(flower.x, gy + 0.9, flower.z, harvestBurstHex(flower), moved, gy, true, flower.lastHarvestVitality);
+  const textColor = flower.color === 'red' ? '#ff3b5c' : flower.color === 'blue' ? '#3f86ff' : '#ffffff';
+  spawnHarvestBurst(flower.x, gy + 0.9, flower.z, harvestBurstHex(flower), moved, gy, true, flower.lastHarvestVitality, textColor);
   maybeSpawnAbilityToken(flower, 0.045 + Math.min(0.04, game.equipment.tool.level * 0.006));
   if (moved > 0 && game.time >= game.nextPollenSound) {
     synth.playPollenPop();
@@ -5099,7 +5103,8 @@ function finishBeeHarvest(b) {
     flower.flash = 1;
     flower.harvestPop = 0.8;
     const gy = flower.groundY || 0;
-    spawnHarvestBurst(flower.x, gy + 0.9, flower.z, harvestBurstHex(flower), gained, gy, true, flower.lastHarvestVitality);
+    const textColor = flower.color === 'red' ? '#ff3b5c' : flower.color === 'blue' ? '#3f86ff' : '#ffffff';
+    spawnHarvestBurst(flower.x, gy + 0.9, flower.z, harvestBurstHex(flower), gained, gy, true, flower.lastHarvestVitality, textColor);
     if ((b.rarity === 'Epic' || b.rarity === 'Legendary') && Math.random() < (passive ? 0.12 : 0.24)) {
       const count = b.rarity === 'Legendary' ? 7 : 4;
       pollinateNearbyFlowers(flower.x, flower.z, 5.4, count, 60, flower.fieldType);
@@ -5603,7 +5608,12 @@ function makeFloatTextSprite() {
 function drawFloatText(spr, text, colorHex) {
   const ctx = spr.userData.ctx;
   ctx.clearRect(0, 0, 128, 64);
-  const col = '#' + colorHex.toString(16).padStart(6, '0');
+  let col;
+  if (typeof colorHex === 'string') {
+    col = colorHex;
+  } else {
+    col = '#' + colorHex.toString(16).padStart(6, '0');
+  }
   ctx.font = 'bold 34px Outfit, sans-serif';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(8,10,16,0.85)';
@@ -5613,7 +5623,7 @@ function drawFloatText(spr, text, colorHex) {
   spr.userData.tex.needsUpdate = true;
 }
 
-function spawnHarvestBurst(x, y, z, colorHex, amount, groundY = 0, showAmount = true, vitality = 1) {
+function spawnHarvestBurst(x, y, z, colorHex, amount, groundY = 0, showAmount = true, vitality = 1, textColor = 0xfff2a6) {
   if (game.harvestFX.length >= HARVEST_FX_MAX) return;
   const fx = harvestFXPool.pop() || (() => {
     const group = new THREE.Group();
@@ -5635,7 +5645,7 @@ function spawnHarvestBurst(x, y, z, colorHex, amount, groundY = 0, showAmount = 
   fx.ring.scale.setScalar(fx.peakScale);
   fx.ring.position.set(x, groundY + 0.12, z);
   fx.text.visible = showAmount;
-  if (showAmount) drawFloatText(fx.text, '+' + Math.round(amount), 0xfff2a6);
+  if (showAmount) drawFloatText(fx.text, '+' + Math.round(amount), textColor);
   fx.text.position.set(x, y + 0.2, z);
   fx.text.material.opacity = 1;
   fx.life = 0;
@@ -5674,7 +5684,8 @@ function spawnPollenOrbs(flower, boost) {
   const gy = flower.groundY || 0;
   flower.flash = 1;
   flower.harvestPop = 1;
-  spawnHarvestBurst(flower.x, gy + 0.9, flower.z, harvestBurstHex(flower), val, gy, false, flower.lastHarvestVitality);
+  const textColor = flower.color === 'red' ? '#ff3b5c' : flower.color === 'blue' ? '#3f86ff' : '#ffffff';
+  spawnHarvestBurst(flower.x, gy + 0.9, flower.z, harvestBurstHex(flower), val, gy, false, flower.lastHarvestVitality, textColor);
   if (game.time >= (game.nextHarvestSfx || 0)) {
     synth.playPollenPop();
     game.nextHarvestSfx = game.time + 0.06;
