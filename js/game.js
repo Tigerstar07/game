@@ -2338,15 +2338,21 @@ function releasePollenOrbModel(model) {
   pollenOrbPool.push(model);
 }
 
+const abilityTokenTextureLoader = new THREE.TextureLoader();
+const celestialLinkTexture = abilityTokenTextureLoader.load('assets/celestial_link.png');
+celestialLinkTexture.encoding = THREE.sRGBEncoding;
+celestialLinkTexture.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy?.() || 1);
+
 const ABILITY_TOKEN_DEFS = {
   honeyDrop: { label: 'Honey Drop', color: 0xffcc00, life: 14 },
   pollenBurst: { label: 'Pollen Burst', color: 0x28d7c5, life: 12 },
-  beeFocus: { label: 'Bloom Chain', color: 0x7fd8ff, life: 18 },
+  beeFocus: { label: 'Celestial Link', color: 0x7fd8ff, life: 18 },
   nectarHaze: { label: 'Nectar Haze', color: 0xb8ff66, life: 15 },
   marketSpark: { label: 'Market Spark', color: 0x8a7cff, life: 15 },
   royalGlow: { label: 'Royal Glow', color: 0xff7a3a, life: 16 },
 };
 const ABILITY_TOKEN_TOUCH_RADIUS = 1.18;
+const ABILITY_TOKEN_SPAWN_TIME = 0.68;
 const abilityTokenAssets = {
   pedestalGeo: new THREE.CylinderGeometry(0.58, 0.72, 0.1, 18),
   coinGeo: new THREE.CylinderGeometry(0.36, 0.36, 0.09, 18),
@@ -2362,18 +2368,36 @@ const abilityTokenPool = [];
 function getAbilityTokenMaterials(type) {
   if (!abilityTokenAssets.materials.has(type)) {
     const def = ABILITY_TOKEN_DEFS[type] || ABILITY_TOKEN_DEFS.pollenBurst;
+    const celestial = type === 'beeFocus';
     const c = new THREE.Color(def.color);
     abilityTokenAssets.materials.set(type, {
-      pedestal: new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.26, depthWrite: false }),
-      coin: new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.97 }),
-      ring: new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.72 }),
-      outerRing: new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.42, depthWrite: false }),
-      glow: new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.28, depthWrite: false }),
-      icon: new THREE.MeshBasicMaterial({ color: 0xeaffff, transparent: true, opacity: 0.98 }),
+      pedestal: new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: celestial ? 0.14 : 0.2, depthWrite: false }),
+      coin: new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: celestial ? 0.2 : 0.9 }),
+      ring: new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: celestial ? 0.44 : 0.58 }),
+      outerRing: new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: celestial ? 0.18 : 0.24, depthWrite: false }),
+      glow: new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: celestial ? 0.1 : 0.14, depthWrite: false }),
+      icon: celestial
+        ? new THREE.MeshBasicMaterial({
+            color: 0xffffff,
+            transparent: true,
+            opacity: 0
+          })
+        : new THREE.MeshBasicMaterial({ color: 0xeaffff, transparent: true, opacity: 0.98 }),
+      imageIcon: celestial
+        ? new THREE.SpriteMaterial({
+            color: 0xffffff,
+            map: celestialLinkTexture,
+            transparent: true,
+            opacity: 0.96,
+            alphaTest: 0.03,
+            depthWrite: false,
+            depthTest: true
+          })
+        : null,
       beacon: new THREE.MeshBasicMaterial({
         color: c,
         transparent: true,
-        opacity: 0.16,
+        opacity: celestial ? 0.06 : 0.08,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
         side: THREE.DoubleSide
@@ -2385,12 +2409,24 @@ function getAbilityTokenMaterials(type) {
 
 function setAbilityTokenType(model, type) {
   const mats = getAbilityTokenMaterials(type);
+  const celestial = type === 'beeFocus';
   model.userData.pedestal.material = mats.pedestal;
   model.userData.coin.material = mats.coin;
   model.userData.ring.material = mats.ring;
   model.userData.outerRing.material = mats.outerRing;
   model.userData.glow.material = mats.glow;
   model.userData.icon.material = mats.icon;
+  model.userData.icon.geometry = abilityTokenAssets.iconGeo;
+  model.userData.icon.visible = !celestial;
+  model.userData.icon.position.set(0, 0.11, 0);
+  model.userData.icon.rotation.set(0, 0, 0);
+  model.userData.imageIcon.visible = celestial;
+  if (celestial) {
+    model.userData.imageIcon.material = mats.imageIcon;
+    model.userData.imageIcon.material.rotation = 0;
+    model.userData.imageIcon.position.set(0, 0.18, -0.04);
+    model.userData.imageIcon.scale.set(1.14, 1.14, 1);
+  }
   model.userData.beacon.material = mats.beacon;
   model.userData.type = type;
 }
@@ -2416,10 +2452,15 @@ function createAbilityTokenModel(type) {
   const icon = new THREE.Mesh(abilityTokenAssets.iconGeo, mats.icon);
   icon.position.y = 0.11;
   group.add(icon);
+  const imageIcon = new THREE.Sprite(getAbilityTokenMaterials('beeFocus').imageIcon);
+  imageIcon.position.set(0, 0.18, -0.04);
+  imageIcon.scale.set(1.14, 1.14, 1);
+  imageIcon.visible = type === 'beeFocus';
+  group.add(imageIcon);
   const beacon = new THREE.Mesh(abilityTokenAssets.beaconGeo, mats.beacon);
   beacon.position.y = 0.72;
   group.add(beacon);
-  group.userData = { pedestal, coin, ring, outerRing, glow, icon, beacon, type };
+  group.userData = { pedestal, coin, ring, outerRing, glow, icon, imageIcon, beacon, type };
   return group;
 }
 
@@ -2462,6 +2503,7 @@ function spawnAbilityToken(type, x, z, spread = 1.2) {
   const token = {
     type, x: ox, z: oz, y, groundY: terrainHeightAt(ox, oz),
     life: def.life, phase: Math.random() * Math.PI * 2,
+    spawnAge: 0,
     model,
   };
   game.abilityTokens.push(token);
@@ -2498,7 +2540,7 @@ function applyAbilityToken(token) {
       const elig = eligibleBees();
       if (elig.length >= T.bloom.minBees) {
         startBloom(elig);
-        showTutorial('Bloom Chain ready — reach the Celest marked START.');
+        showTutorial('Celestial Link ready — reach the Celest marked START.');
       } else {
         showTutorial('Bloom Chain needs at least 3 active Lumens.');
       }
@@ -2526,21 +2568,39 @@ function applyAbilityToken(token) {
 
 function updateAbilityTokenVisual(token, dt) {
   if (!token?.model) return;
+  const celestial = token.type === 'beeFocus';
+  token.spawnAge = Math.min(ABILITY_TOKEN_SPAWN_TIME, (token.spawnAge || 0) + dt);
+  const spawnT = clamp(token.spawnAge / ABILITY_TOKEN_SPAWN_TIME, 0, 1);
+  const spawnEase = spawnT * spawnT * (3 - 2 * spawnT);
+  const forming = spawnT < 1;
+
   token.phase += dt * 3.8;
-  token.y = (token.groundY || 0) + 0.86 + Math.sin(token.phase) * 0.18;
+  const hoverY = (token.groundY || 0) + 0.86 + Math.sin(token.phase) * (celestial ? 0.12 : 0.16);
+  const introY = (token.groundY || 0) + 1.62;
+  token.y = lerp(introY, hoverY, spawnEase);
   token.model.position.set(token.x, token.y, token.z);
-  token.model.rotation.y += dt * 1.35;
+  token.model.rotation.y += dt * (forming ? (celestial ? 12.5 : 8.5) : (celestial ? 0.62 : 1.2));
 
   const u = token.model.userData;
-  u.coin.rotation.z += dt * 1.4;
-  u.ring.rotation.z -= dt * 2.6;
-  u.outerRing.rotation.z += dt * 1.55;
-  u.icon.rotation.y -= dt * 4.2;
-  u.icon.rotation.x += dt * 2.4;
-  u.beacon.material.opacity = 0.12 + (Math.sin(token.phase * 1.6) * 0.5 + 0.5) * 0.13;
-  u.outerRing.material.opacity = 0.34 + (Math.sin(token.phase * 1.25) * 0.5 + 0.5) * 0.2;
-  const pulse = 1.42 + Math.sin(token.phase * 1.6) * 0.12;
-  token.model.scale.setScalar(pulse);
+  u.coin.rotation.z += dt * (celestial ? 0.55 : 1.25);
+  u.ring.rotation.z -= dt * (forming ? 5.0 : (celestial ? 0.85 : 2.2));
+  u.outerRing.rotation.z += dt * (forming ? 4.2 : (celestial ? 0.72 : 1.35));
+  if (celestial) {
+    u.icon.rotation.x = 0;
+    u.icon.rotation.y = 0;
+    u.icon.rotation.z = 0;
+    u.imageIcon.material.rotation -= dt * (forming ? 13.5 : 0.78);
+    u.imageIcon.material.opacity = forming ? lerp(0.25, 0.96, spawnEase) : 0.96;
+  } else {
+    u.icon.rotation.y -= dt * 3.5;
+    u.icon.rotation.x += dt * 2.0;
+  }
+  const glowWave = Math.sin(token.phase * 1.45) * 0.5 + 0.5;
+  u.beacon.material.opacity = (celestial ? 0.035 : 0.055) + glowWave * (celestial ? 0.055 : 0.08);
+  u.outerRing.material.opacity = (celestial ? 0.16 : 0.22) + glowWave * (celestial ? 0.08 : 0.11);
+  u.glow.material.opacity = (celestial ? 0.07 : 0.1) + glowWave * (celestial ? 0.035 : 0.05);
+  const pulse = (celestial ? 1.18 : 1.34) + Math.sin(token.phase * 1.6) * (celestial ? 0.055 : 0.1);
+  token.model.scale.setScalar(lerp(0.24, pulse, spawnEase));
 }
 
 function updateAbilityTokens(dt) {
@@ -2548,10 +2608,12 @@ function updateAbilityTokens(dt) {
   for (let i = game.abilityTokens.length - 1; i >= 0; i--) {
     const t = game.abilityTokens[i];
     t.life -= dt;
+    updateAbilityTokenVisual(t, dt);
     const d = dist2(p.x, p.z, t.x, t.z);
     // Ability tokens are deliberate touch pickups. They stay exactly where the
     // bee spawned them; magnets affect pollen/honey drops, not ability tokens.
-    if (d < ABILITY_TOKEN_TOUCH_RADIUS) {
+    const collectionReady = (t.spawnAge || 0) >= ABILITY_TOKEN_SPAWN_TIME * 0.82;
+    if (collectionReady && d < ABILITY_TOKEN_TOUCH_RADIUS) {
       applyAbilityToken(t);
       releaseAbilityTokenModel(t.model);
       game.abilityTokens.splice(i, 1);
@@ -2562,7 +2624,6 @@ function updateAbilityTokens(dt) {
       game.abilityTokens.splice(i, 1);
       continue;
     }
-    updateAbilityTokenVisual(t, dt);
   }
 }
 
@@ -5873,7 +5934,7 @@ function updateBloom(dt) {
         if (spawnAbilityToken('beeFocus', x, z)) {
           celest.chainReadyTimer = ABILITY_TOKEN_DEFS.beeFocus.life;
           game.bloomCooldown = T.bloom.cooldown;
-          showTutorial('Celest Lumen formed a Bloom Chain token between the flowers.');
+          showTutorial('Celest Lumen formed a Celestial Link token between the flowers.');
         }
       }
     }
