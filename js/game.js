@@ -49,9 +49,9 @@ camera.position.set(0, 25, 60);
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
 const renderQuality = {
   maxDpr: Math.min(window.devicePixelRatio || 1, 1.15),
-  minDpr: Math.min(window.devicePixelRatio || 1, 0.8),
+  minDpr: Math.min(window.devicePixelRatio || 1, 0.72),
   dpr: Math.min(window.devicePixelRatio || 1, 1.15),
-  adaptive: false,
+  adaptive: true,
   averageWorkMs: 0,
   samples: 0,
   cooldown: 0,
@@ -76,7 +76,7 @@ window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderQuality.maxDpr = Math.min(window.devicePixelRatio || 1, 1.15);
-  renderQuality.minDpr = Math.min(window.devicePixelRatio || 1, 0.8);
+  renderQuality.minDpr = Math.min(window.devicePixelRatio || 1, 0.72);
   renderQuality.dpr = clamp(renderQuality.dpr, renderQuality.minDpr, renderQuality.maxDpr);
   applyRenderPixelRatio();
   renderer.setSize(window.innerWidth, window.innerHeight);
@@ -2078,6 +2078,7 @@ function createApiary() {
     const bay = createHiveBay(i);
     bay.group.position.set(HIVE_BAYS[i].x, 0, HIVE_BAYS[i].z);
     bay.group.rotation.y = BAY_FACING;
+    bay.group.scale.setScalar(HIVE_WORLD_SCALE);
     bay.facing = BAY_FACING;
     root.add(bay.group);
     bays.push(bay);
@@ -2715,14 +2716,17 @@ const HIVE_POS = { x: 0, z: 88 };           // central bay — default hive refe
 const PLAYER_START = { x: 0, z: 72 };        // in the starting plaza, facing the hive row
 const TRADE_POS = { x: 38, z: 70 };          // stock terminal, in the starting plaza
 const SHOP_POS  = { x: -50, z: 86 };         // walk-up shop stall, tucked at the left end of the hive row
+const HIVE_WORLD_SCALE = 1.06;
+const FLOWER_WORLD_SCALE = 1.10;
+const BEE_WORLD_SCALE = 1.10;
 
 // Bee Swarm Simulator–style apiary: a row of claimable hive bays along one edge.
 // The bays FACE the plaza (toward -Z / the meadow); the deck & fence sit behind them
-// on the island rim. Outer bays curve gently forward into a concave row.
+// on the island rim. Keep them in one clean row so every comb board lines up.
 const HIVE_BAY_COUNT = 5;
 const HIVE_BAYS = [];
 for (let k = -2; k <= 2; k++) {
-  HIVE_BAYS.push({ x: k * 19.5, z: HIVE_POS.z + Math.abs(k) * 1.9 });
+  HIVE_BAYS.push({ x: k * 20.8, z: HIVE_POS.z });
 }
 const APIARY_CENTER = { x: 0, z: HIVE_POS.z + 1 };
 const BAY_FACING = Math.PI;                  // bays rotated to face the plaza
@@ -3089,8 +3093,9 @@ function terrainHeightAt(x, z) {
     h = Math.max(h, 0.3);
   }
   for (const bay of HIVE_BAYS) {
-    const platformZ = bay.z + 0.4; // local z -0.4 rotated by BAY_FACING
-    if (sqDist(x, z, bay.x, platformZ) <= 4.85 * 4.85) h = Math.max(h, 0.6);
+    const platformZ = bay.z + 0.4 * HIVE_WORLD_SCALE; // local z -0.4 rotated by BAY_FACING
+    const platformR = 4.85 * HIVE_WORLD_SCALE;
+    if (sqDist(x, z, bay.x, platformZ) <= platformR * platformR) h = Math.max(h, 0.6);
   }
   return h;
 }
@@ -3460,7 +3465,8 @@ function spawnFlowers() {
       const baseTier = randomFlowerBaseTier(field);
       const maxPollen = flowerTierCapacity(baseTier);
       const model = createFlowerModel(hue);
-      const scale = field.id === 'rare' ? rand(1.08, 1.24) : field.id === 'starter' ? rand(0.9, 1.04) : rand(1.0, 1.16);
+      const fieldScale = field.id === 'rare' ? rand(1.08, 1.24) : field.id === 'starter' ? rand(0.9, 1.04) : rand(1.0, 1.16);
+      const scale = fieldScale * FLOWER_WORLD_SCALE;
       const groundY = field.elevation || 0;
       model.position.set(x, groundY, z);
       model.rotation.y = Math.random() * Math.PI * 2;
@@ -3560,6 +3566,7 @@ function makeLumen(beeData = null) {
   }
   if (slot) slot.beeId = data.id;
   const model = createBeeModel(data.hue, data.accent || 'none');
+  model.scale.setScalar(BEE_WORLD_SCALE);
   const comboLabel = createBeeComboLabel();
   model.add(comboLabel);
   model.userData.comboLabel = comboLabel;
@@ -3657,11 +3664,13 @@ function initWorld() {
   for (const bay of apiary.bays) {
     game.colliders.push({
       id: `hive_wall_${bay.index}`, type: 'aabb',
-      x: bay.pos.x, z: bay.pos.z + 2.5, hx: 4.65, hz: 0.48,
+      x: bay.pos.x, z: bay.pos.z + 2.5 * HIVE_WORLD_SCALE,
+      hx: 4.65 * HIVE_WORLD_SCALE, hz: 0.48 * HIVE_WORLD_SCALE,
     });
     game.colliders.push({
       id: `hive_pot_${bay.index}`, type: 'circle',
-      x: bay.pos.x, z: bay.pos.z - 2.4, r: 0.82,
+      x: bay.pos.x, z: bay.pos.z - 2.4 * HIVE_WORLD_SCALE,
+      r: 0.82 * HIVE_WORLD_SCALE,
     });
   }
   game.colliders.push({
@@ -3702,6 +3711,17 @@ function initWorld() {
 
 // ======================== INPUT HANDLING ========================
 const keys = new Set();
+const CAMERA_THIRD_PERSON_FOV = 50;
+const CAMERA_FIRST_PERSON_FOV = 62;
+const CAMERA_FIRST_PERSON_MIN_PITCH = -1.35;
+const CAMERA_FIRST_PERSON_MAX_PITCH = 1.35;
+const CAMERA_FIRST_PERSON_EYE_HEIGHT = 1.68;
+const CAMERA_FIRST_PERSON_HEAD_BOB = 0.035;
+const CAMERA_FIRST_PERSON_SIDE_BOB = 0.018;
+const CAMERA_THIRD_PERSON_MIN_PITCH = -0.48;
+const CAMERA_THIRD_PERSON_MAX_PITCH = 1.22;
+const CAMERA_THIRD_PERSON_LOOK_UP_OFFSET = 20;
+const CAMERA_FOV_LERP = 0.12;
 
 function uiCapturesInput() {
   return game.ui.helpOpen ||
@@ -3718,11 +3738,12 @@ function releaseCameraInput() {
 
 function adjustCameraOrbit(dx, dy) {
   const c = game.camera;
-  c.yaw -= dx * c.sensitivity;
+  const yawMultiplier = c.firstPerson ? 0.82 : 1;
+  c.yaw -= dx * c.sensitivity * yawMultiplier;
   if (c.firstPerson) {
-    c.pitch = clamp(c.pitch - dy * c.sensitivity * 0.7, -1.3, 1.3);
+    c.pitch = clamp(c.pitch - dy * c.sensitivity * 0.58, CAMERA_FIRST_PERSON_MIN_PITCH, CAMERA_FIRST_PERSON_MAX_PITCH);
   } else {
-    c.pitch = clamp(c.pitch + dy * c.sensitivity * 0.65, 0.45, 1.16);
+    c.pitch = clamp(c.pitch + dy * c.sensitivity * 0.65, CAMERA_THIRD_PERSON_MIN_PITCH, CAMERA_THIRD_PERSON_MAX_PITCH);
   }
 }
 
@@ -3791,7 +3812,7 @@ window.addEventListener('keydown', e => {
     if (playerModel) playerModel.visible = !c.firstPerson;
     
     if (!c.firstPerson) {
-      c.pitch = clamp(c.pitch, 0.45, 1.16);
+      c.pitch = clamp(c.pitch, CAMERA_THIRD_PERSON_MIN_PITCH, CAMERA_THIRD_PERSON_MAX_PITCH);
     } else {
       c.pitch = 0.0;
     }
@@ -4418,7 +4439,7 @@ function setBayOwner(bay, name) {
     const nb = createBeeModel(BEE_TYPES[(bay.index + s) % BEE_TYPES.length].hue);
     nb.position.set(cell.podWorld.x, cell.podWorld.y, cell.podWorld.z);
     nb.rotation.y = BAY_FACING;
-    nb.scale.setScalar(0.55);
+    nb.scale.setScalar(0.55 * BEE_WORLD_SCALE);
     scene.add(nb);
     game.neighborBees.push({ model: nb, baseY: cell.podWorld.y, phase: Math.random() * Math.PI * 2 });
     setCombCellVisual(cell, 'rival', 0xb8863b, 0xffb24f);
@@ -4799,25 +4820,44 @@ const cameraDesired = new THREE.Vector3();
 function updateCamera(dt) {
   const c = game.camera;
   const gy = game.player.groundY || 0;
+  const targetFov = c.firstPerson ? CAMERA_FIRST_PERSON_FOV : CAMERA_THIRD_PERSON_FOV;
+  if (Math.abs(camera.fov - targetFov) > 0.02) {
+    camera.fov = lerp(camera.fov, targetFov, smoothK(CAMERA_FOV_LERP, dt));
+    camera.updateProjectionMatrix();
+  }
+
   if (c.firstPerson) {
-    // First person camera positioning inside player head
-    camera.position.set(game.player.x, 1.6 + gy, game.player.z);
+    // First person sits just above the keeper body with a very small gait bob.
+    // The bob is intentionally subtle so gathering still feels precise.
+    const gait = game.player.moving ? game.player.walkPhase : 0;
+    const headBob = game.player.moving ? Math.sin(gait * 2) * CAMERA_FIRST_PERSON_HEAD_BOB : 0;
+    const sideBob = game.player.moving ? Math.sin(gait) * CAMERA_FIRST_PERSON_SIDE_BOB : 0;
+    const rightX = Math.cos(c.yaw);
+    const rightZ = -Math.sin(c.yaw);
+    const eyeX = game.player.x + rightX * sideBob;
+    const eyeY = gy + CAMERA_FIRST_PERSON_EYE_HEIGHT + headBob;
+    const eyeZ = game.player.z + rightZ * sideBob;
+    camera.position.set(eyeX, eyeY, eyeZ);
 
     // Look target in direction of yaw and pitch
-    const targetX = game.player.x - Math.sin(c.yaw) * Math.cos(c.pitch);
-    const targetY = 1.6 + gy + Math.sin(c.pitch);
-    const targetZ = game.player.z - Math.cos(c.yaw) * Math.cos(c.pitch);
+    const targetX = eyeX - Math.sin(c.yaw) * Math.cos(c.pitch);
+    const targetY = eyeY + Math.sin(c.pitch);
+    const targetZ = eyeZ - Math.cos(c.yaw) * Math.cos(c.pitch);
     camera.lookAt(targetX, targetY, targetZ);
   } else {
     // Third person camera
     const horizontal = Math.cos(c.pitch) * c.distance;
     const height = Math.sin(c.pitch) * c.distance;
-    cameraTarget.set(game.player.x, 1.2 + gy, game.player.z);
+    const lookUpAmount = clamp((-c.pitch) / Math.max(0.001, -CAMERA_THIRD_PERSON_MIN_PITCH), 0, 1);
+    const targetYOffset = 1.2 + lookUpAmount * CAMERA_THIRD_PERSON_LOOK_UP_OFFSET;
+    cameraTarget.set(game.player.x, targetYOffset + gy, game.player.z);
     cameraDesired.set(
       game.player.x + Math.sin(c.yaw) * horizontal,
       cameraTarget.y + height,
       game.player.z + Math.cos(c.yaw) * horizontal
     );
+    const cameraGroundY = terrainHeightAt(cameraDesired.x, cameraDesired.z);
+    cameraDesired.y = Math.max(cameraDesired.y, cameraGroundY + 0.85);
     camera.position.lerp(cameraDesired, smoothK(0.08, dt));
     camera.lookAt(cameraTarget);
   }
@@ -7754,9 +7794,8 @@ function updateAdaptiveRenderQuality(workMs, elapsed) {
     ? workMs
     : lerp(renderQuality.averageWorkMs, workMs, 0.025);
   renderQuality.samples++;
-  // DPR changes can visibly blink a WebGL canvas on some Windows/Chrome
-  // combinations. Keep the renderer stable by default and only expose the
-  // measured frame cost through LUM_DEBUG for manual profiling.
+  // Adaptive DPR protects dense flower/bee scenes from dropping frames. Changes
+  // are sampled slowly with a cooldown to avoid visible WebGL canvas blinking.
   if (!renderQuality.adaptive) return;
   renderQuality.cooldown = Math.max(0, renderQuality.cooldown - elapsed);
   if (renderQuality.samples < 120 || renderQuality.cooldown > 0) return;
