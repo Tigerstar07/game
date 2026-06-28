@@ -51,7 +51,11 @@ const renderQuality = {
   maxDpr: Math.min(window.devicePixelRatio || 1, 1.15),
   minDpr: Math.min(window.devicePixelRatio || 1, 0.72),
   dpr: Math.min(window.devicePixelRatio || 1, 1.15),
-  adaptive: true,
+  // Runtime DPR changes are disabled: calling renderer.setPixelRatio() reallocates
+  // the WebGL drawing buffer, which flashes the whole canvas. When frame work-time
+  // hovered near the thresholds the DPR flapped up/down, producing a visible flash
+  // every few seconds. We keep a stable, sharp pixel ratio instead.
+  adaptive: false,
   averageWorkMs: 0,
   samples: 0,
   cooldown: 0,
@@ -3071,10 +3075,15 @@ function beeConversionRate(bee) {
   const base = typeof bee?.conversionRate === 'number' && isFinite(bee.conversionRate)
     ? bee.conversionRate
     : beeBaseConversionRate(bee);
-  return base * (1 + 0.08 * game.upgrades.refine.level + 0.012 * game.perks.refinement.level + 0.035 * game.equipment.jar.level);
+  return base * (1 + 0.08 * game.upgrades.refine.level + 0.012 * game.perks.refinement.level + 0.07 * game.equipment.jar.level);
 }
 
 const refineRate = () => game.lumens.reduce((sum, bee) => sum + beeConversionRate(bee), 0);
+
+// The Honey Jar also accelerates the at-hive conversion itself: each level makes
+// bees shuttle pollen to the comb faster and rest less between trips, so banked
+// pollen turns into honey noticeably quicker (on top of the bigger per-bee flow).
+const jarShuttleBonus = () => 0.06 * game.equipment.jar.level;
 
 // O(1) id -> def lookup. fieldDef() is called per flower, per frame (and again for
 // every bee target pick), so the old linear FIELD_DEFS.find() scan was pure waste.
@@ -4251,7 +4260,7 @@ function updateBeeConversion(b, sp, dt) {
   }
   cell.transiting = true;
   const pack = playerBackpackWorld();
-  const conversionSpeed = sp * T.hive.conversionSpeedMult;
+  const conversionSpeed = sp * T.hive.conversionSpeedMult * (1 + jarShuttleBonus());
 
   if (b.state === 'convertToPack') {
     b.status = 'linking to pack';
@@ -4314,7 +4323,7 @@ function updateBeeConversion(b, sp, dt) {
       }
       b.state = 'resting';
       b.convertResting = true;   // keep spinning in front of the comb, not in the pocket
-      b.restTimer = T.hive.conversionRest;
+      b.restTimer = T.hive.conversionRest / (1 + jarShuttleBonus());
       b.spinTimer = 1.5;
     }
   }
@@ -6004,7 +6013,7 @@ const SHOP_SECTIONS = [
       { key:'boots', name:'Faster Boots', desc:'+6% movement speed', cost: bootsCost, tag:'Equipment' },
       { key:'whistle', name:'Better Bee Whistle', desc:'+6% bee travel speed', cost: whistleCost, tag:'Equipment' },
       { key:'magnet', name:'Pollen Magnet', desc:'+0.8 pickup radius', cost: magnetCost, tag:'Equipment' },
-      { key:'jar', name:'Honey Jar', desc:'+3% pollen-to-honey conversion', cost: jarCost, tag:'Equipment' },
+      { key:'jar', name:'Honey Jar', desc:'+3% honey yield & faster hive conversion', cost: jarCost, tag:'Equipment' },
       { key:'scanner', name:'Field Scanner', desc:'Adds a compass toward healthy flowers without overhead labels', cost: scannerCost, tag:'Equipment' },
     ]
   },
@@ -7609,7 +7618,7 @@ function updateHUD(dt) {
       } else if (item.key === 'magnet') {
         descEl.textContent = `+${(lvl*0.8).toFixed(1)} -> +${((lvl+1)*0.8).toFixed(1)} radius`;
       } else if (item.key === 'jar') {
-        descEl.textContent = `+${(lvl*3)}% -> +${((lvl+1)*3)}% conversion yield`;
+        descEl.textContent = `+${(lvl*3)}% -> +${((lvl+1)*3)}% yield, +${(lvl*7)}% -> +${((lvl+1)*7)}% convert speed`;
       } else if (item.key === 'pack') {
         descEl.textContent = `+${(lvl*40)} -> +${((lvl+1)*40)} pack capacity`;
       } else if (item.key === 'scanner') {
