@@ -766,8 +766,13 @@ body.shift-lock-active #gameContainer canvas {
   align-items: center;
   justify-content: center;
   padding: 70px 24px 54px;
-  background: rgba(1, 6, 8, 0.44);
-  backdrop-filter: blur(6px);
+  background: rgba(1, 6, 8, 0);
+  backdrop-filter: blur(0px);
+  animation: modalBgIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+@keyframes modalBgIn {
+  0% { background: rgba(1, 6, 8, 0); backdrop-filter: blur(0px); }
+  100% { background: rgba(1, 6, 8, 0.44); backdrop-filter: blur(6px); }
 }
 .modal-panel {
   width: min(980px, calc(100vw - 48px));
@@ -778,6 +783,11 @@ body.shift-lock-active #gameContainer canvas {
   background: rgba(8, 20, 25, 0.94);
   box-shadow: 0 24px 80px rgba(0,0,0,0.65);
   padding: 18px;
+  animation: modalPanelIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+@keyframes modalPanelIn {
+  0% { opacity: 0; transform: translateY(40px) scale(0.92); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
 }
 .modal-header {
   display: flex;
@@ -2480,4 +2490,251 @@ body.egg-dragging #gameContainer canvas {
     width: auto;
     transform: none;
   }
+}
+
+/* ====== ACTIVE ABILITIES HUD (bottom-left corner) ====== */
+.active-abilities-hud {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  z-index: 21;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none; /* Let clicks pass through if they click outside items */
+  transition: left 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.active-ability-item {
+  pointer-events: auto; /* Enable mouse hover/interaction */
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: rgba(18, 22, 28, 0.72);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  min-width: 185px;
+  position: relative;
+  transition: transform 0.2s ease, border-color 0.2s ease, opacity 0.15s ease;
+  overflow: visible;
+}
+
+.active-ability-item:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.active-ability-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  background: rgba(255, 255, 255, 0.1);
+  flex-shrink: 0;
+  box-shadow: inset 0 0 8px rgba(255, 255, 255, 0.1);
+  transition: opacity 0.15s ease, filter 0.15s ease;
+}
+
+.active-ability-info {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+}
+
+.active-ability-name {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #ffffff;
+}
+
+.active-ability-bar-container {
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 2px;
+  margin-top: 4px;
+  overflow: hidden;
+}
+
+.active-ability-bar-fill {
+  height: 100%;
+  width: 100%;
+  border-radius: 2px;
+  transform-origin: left;
+  transition: width 0.1s linear, background-color 0.2s ease;
+}
+
+/* Tooltip on hover */
+.active-ability-tooltip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  background: rgba(10, 12, 16, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  padding: 8px 12px;
+  width: 220px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s;
+  transform: translateY(4px);
+  z-index: 100;
+  pointer-events: none;
+}
+
+.active-ability-item:hover .active-ability-tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.active-ability-tooltip-title {
+  font-size: 11px;
+  font-weight: 800;
+  color: #fff;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+
+.active-ability-tooltip-desc {
+  font-size: 10px;
+  color: #a0aec0;
+  line-height: 1.4;
+  margin-bottom: 6px;
+}
+
+.active-ability-tooltip-time {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--gold);
+}
+
+/* Shift active abilities HUD to the right if inventory is open on desktop */
+#inventoryBar:not(.hidden) ~ #activeAbilities {
+  left: 400px;
+}
+
+@media (max-width: 700px) {
+  #activeAbilities {
+    left: 84px; /* Shift to the right of the inventory toggle button on mobile */
+    bottom: 16px;
+  }
+  
+  /* Reset desktop sibling selector shift on mobile */
+  #inventoryBar:not(.hidden) ~ #activeAbilities {
+    left: 84px;
+  }
+}
+
+.active-ability-img-icon {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  display: block;
+}
+
+.active-ability-svg-icon {
+  display: block;
+  filter: drop-shadow(0 0 3px rgba(40, 215, 197, 0.6));
+}
+
+/* ====== SATISFYING UI OPEN ANIMATIONS ====== */
+@keyframes itemDropIn {
+  0% { opacity: 0; transform: translateY(24px) scale(0.9); }
+  60% { opacity: 1; transform: translateY(-3px) scale(1.01); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes itemSlideIn {
+  0% { opacity: 0; transform: translateX(-20px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes itemFadeUp {
+  0% { opacity: 0; transform: translateY(16px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.modal-panel .upg {
+  animation: itemDropIn 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+}
+.modal-panel .upg:nth-child(1) { animation-delay: 0.06s; }
+.modal-panel .upg:nth-child(2) { animation-delay: 0.12s; }
+.modal-panel .upg:nth-child(3) { animation-delay: 0.18s; }
+.modal-panel .upg:nth-child(4) { animation-delay: 0.24s; }
+.modal-panel .upg:nth-child(5) { animation-delay: 0.30s; }
+.modal-panel .upg:nth-child(6) { animation-delay: 0.36s; }
+.modal-panel .upg:nth-child(7) { animation-delay: 0.42s; }
+.modal-panel .upg:nth-child(8) { animation-delay: 0.48s; }
+
+.modal-panel .shop-tab {
+  animation: itemFadeUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+.modal-panel .shop-tab:nth-child(1) { animation-delay: 0.05s; }
+.modal-panel .shop-tab:nth-child(2) { animation-delay: 0.1s; }
+.modal-panel .shop-tab:nth-child(3) { animation-delay: 0.15s; }
+
+.modal-header {
+  animation: itemFadeUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  animation-delay: 0.02s;
+}
+
+.perk-list .perk-row {
+  animation: itemDropIn 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+}
+.perk-list .perk-row:nth-child(1) { animation-delay: 0.06s; }
+.perk-list .perk-row:nth-child(2) { animation-delay: 0.12s; }
+.perk-list .perk-row:nth-child(3) { animation-delay: 0.18s; }
+.perk-list .perk-row:nth-child(4) { animation-delay: 0.24s; }
+.perk-list .perk-row:nth-child(5) { animation-delay: 0.30s; }
+
+/* Inventory drawer slide animation */
+.inventory-bar.inventory-drawer:not(.hidden) {
+  animation: invDrawerIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+@keyframes invDrawerIn {
+  0% { opacity: 0; transform: translateX(-30px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+
+.inventory-drawer .inv-egg,
+.inventory-drawer .inv-empty {
+  animation: itemSlideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+.inventory-drawer .inv-egg:nth-child(1),
+.inventory-drawer .inv-empty:nth-child(1) { animation-delay: 0.08s; }
+.inventory-drawer .inv-egg:nth-child(2) { animation-delay: 0.14s; }
+.inventory-drawer .inv-egg:nth-child(3) { animation-delay: 0.20s; }
+.inventory-drawer .inv-egg:nth-child(4) { animation-delay: 0.26s; }
+.inventory-drawer .inv-egg:nth-child(5) { animation-delay: 0.32s; }
+
+/* Controls drawer animation */
+.controls-bar.controls-drawer:not(.hidden) {
+  animation: itemFadeUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+/* Full market terminal rows */
+.terminal-sidebar > div {
+  animation: itemSlideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+.terminal-sidebar > div:nth-child(1) { animation-delay: 0.06s; }
+.terminal-sidebar > div:nth-child(2) { animation-delay: 0.12s; }
+.terminal-sidebar > div:nth-child(3) { animation-delay: 0.18s; }
+.terminal-sidebar > div:nth-child(4) { animation-delay: 0.24s; }
+.terminal-sidebar > div:nth-child(5) { animation-delay: 0.30s; }
+
+/* Inventory toggle button pop */
+.inventory-toggle:not(.hidden) {
+  animation: itemDropIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+  animation-delay: 0.2s;
 }

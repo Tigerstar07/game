@@ -2168,6 +2168,30 @@ function createShopStall() {
     crate.position.set(cx, cy, cz); crate.castShadow = true; group.add(crate);
   }
 
+  // Flower planters beside the stall for extra market charm
+  const planterMat = new THREE.MeshStandardMaterial({ color: 0x7a4525, roughness: 0.85 });
+  const flowerMat1 = new THREE.MeshStandardMaterial({ color: 0xff6090, emissive: 0xff6090, emissiveIntensity: 0.15, roughness: 0.5 });
+  const flowerMat2 = new THREE.MeshStandardMaterial({ color: 0xffcc00, emissive: 0xffcc00, emissiveIntensity: 0.15, roughness: 0.5 });
+  for (const [px, pz, fm] of [[-2.8, 1.4, flowerMat1], [2.9, 1.5, flowerMat2]]) {
+    const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.38, 0.55, 10), planterMat);
+    pot.position.set(px, 0.36, pz); pot.castShadow = true; group.add(pot);
+    const dirt = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.06, 10), new THREE.MeshStandardMaterial({ color: 0x3a2a18, roughness: 1 }));
+    dirt.position.set(px, 0.64, pz); group.add(dirt);
+    for (let fi = 0; fi < 3; fi++) {
+      const petal = new THREE.Mesh(new THREE.SphereGeometry(0.12, 6, 4), fm);
+      petal.position.set(px + Math.cos(fi * 2.1) * 0.14, 0.82, pz + Math.sin(fi * 2.1) * 0.14);
+      group.add(petal);
+    }
+  }
+
+  // Warm hanging lantern
+  const lanternBody = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.2, 0.36, 8), new THREE.MeshStandardMaterial({ color: 0x2a2018, roughness: 0.7, metalness: 0.3 }));
+  lanternBody.position.set(1.5, 3.15, 0.8); group.add(lanternBody);
+  const lanternGlow = new THREE.Mesh(new THREE.SphereGeometry(0.12, 6, 4), new THREE.MeshStandardMaterial({ color: 0xffc46a, emissive: 0xffc46a, emissiveIntensity: 0.8, transparent: true, opacity: 0.9 }));
+  lanternGlow.position.set(1.5, 3.15, 0.8); group.add(lanternGlow);
+  const lanternLight = new THREE.PointLight(0xffc46a, 0.4, 6);
+  lanternLight.position.set(1.5, 3.15, 0.8); group.add(lanternLight);
+
   // Hanging sign
   const sign = makeBaySign('🛒  SHOP');
   sign.position.set(0, 4.55, 0.45); sign.scale.set(3.0, 0.75, 1);
@@ -2388,14 +2412,15 @@ function getAbilityTokenMaterials(type) {
           })
         : new THREE.MeshBasicMaterial({ color: 0xeaffff, transparent: true, opacity: 0.98 }),
       imageIcon: celestial
-        ? new THREE.SpriteMaterial({
+        ? new THREE.MeshBasicMaterial({
             color: 0xffffff,
             map: celestialLinkTexture,
             transparent: true,
             opacity: 0.96,
             alphaTest: 0.03,
             depthWrite: false,
-            depthTest: true
+            depthTest: true,
+            side: THREE.DoubleSide
           })
         : null,
       beacon: new THREE.MeshBasicMaterial({
@@ -2427,9 +2452,9 @@ function setAbilityTokenType(model, type) {
   model.userData.imageIcon.visible = celestial;
   if (celestial) {
     model.userData.imageIcon.material = mats.imageIcon;
-    model.userData.imageIcon.material.rotation = 0;
-    model.userData.imageIcon.position.set(0, 0.18, -0.04);
-    model.userData.imageIcon.scale.set(1.14, 1.14, 1);
+    model.userData.imageIcon.rotation.set(0, 0, 0);
+    model.userData.imageIcon.position.set(0, 0.65, -0.04);
+    model.userData.imageIcon.scale.set(2.2, 2.2, 1);
   }
   model.userData.beacon.material = mats.beacon;
   model.userData.type = type;
@@ -2456,9 +2481,9 @@ function createAbilityTokenModel(type) {
   const icon = new THREE.Mesh(abilityTokenAssets.iconGeo, mats.icon);
   icon.position.y = 0.11;
   group.add(icon);
-  const imageIcon = new THREE.Sprite(getAbilityTokenMaterials('beeFocus').imageIcon);
-  imageIcon.position.set(0, 0.18, -0.04);
-  imageIcon.scale.set(1.14, 1.14, 1);
+  const imageIcon = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 1.0), getAbilityTokenMaterials('beeFocus').imageIcon);
+  imageIcon.position.set(0, 0.65, -0.04);
+  imageIcon.scale.set(2.2, 2.2, 1);
   imageIcon.visible = type === 'beeFocus';
   group.add(imageIcon);
   const beacon = new THREE.Mesh(abilityTokenAssets.beaconGeo, mats.beacon);
@@ -2593,7 +2618,10 @@ function updateAbilityTokenVisual(token, dt) {
     u.icon.rotation.x = 0;
     u.icon.rotation.y = 0;
     u.icon.rotation.z = 0;
-    u.imageIcon.material.rotation -= dt * (forming ? 13.5 : 0.78);
+    // Stand straight up vertically and slowly spin around the Y-axis
+    u.imageIcon.rotation.y += dt * (forming ? 4.5 : 1.25);
+    u.imageIcon.rotation.x = 0;
+    u.imageIcon.rotation.z = 0;
     u.imageIcon.material.opacity = forming ? lerp(0.25, 0.96, spawnEase) : 0.96;
   } else {
     u.icon.rotation.y -= dt * 3.5;
@@ -3723,7 +3751,7 @@ function initWorld() {
   // Walk-up shop stall — sits at the end of the hive row, angled out toward the fields.
   const shopStall = createShopStall();
   shopStall.position.set(SHOP_POS.x, 0, SHOP_POS.z);
-  shopStall.rotation.y = Math.PI + 0.62;       // face the plaza/fields, tilted toward the meadow
+  shopStall.rotation.y = 2.22;                  // face outward toward the meadow and flower fields
   scene.add(shopStall);
   game.shopStall = shopStall;
 
@@ -5270,26 +5298,28 @@ function updateLumen(b, dt) {
         b.idleHover = true;
         const idx = b.swarmIndex || 0;
         const p = b.idlePhase || 0;
-        // Active circular spinning orbit around the player
-        const baseAngle = b.idleAngle + game.time * (b.idleOrbitSpeed || 0.42) * 5.0;
-        // Disperse distance to form a clean circular disc/spiral shell
-        const distance = 1.1 + (idx % 3) * 0.5;
-        // Tiny wave deviation to keep it organic without losing the spinning circle shape
-        const wanderX = Math.sin(game.time * 2.5 + p) * 0.15;
-        const wanderZ = Math.cos(game.time * 2.5 + p) * 0.15;
+        // Orbit direction: alternate clockwise and counter-clockwise
+        const direction = (idx % 2 === 0) ? 1 : -1;
+        // Orbit angle at a fast, steady speed (5.2 factor) + added phase offset to prevent chirp acceleration over time
+        const baseAngle = b.idleAngle + game.time * (b.idleOrbitSpeed || 0.42) * 5.2 * direction + Math.sin(game.time * 1.8 + idx) * 0.35;
+        // Closer around the player but fanned out organically (1.3m to 3.5m) and breathing in/out dynamically
+        const distance = 1.3 + ((idx * 2) % 5) * 0.55 + Math.sin(game.time * 0.85 + idx * 1.5) * 0.42;
+        // Moderate organic wander offsets
+        const wanderX = Math.sin(game.time * 1.3 + p) * 0.22;
+        const wanderZ = Math.cos(game.time * 1.3 + p) * 0.22;
         
         const base = game.player.moving ? st : game.player;
         const hoverX = base.x + Math.sin(baseAngle) * distance + wanderX;
         const hoverZ = base.z + Math.cos(baseAngle) * distance + wanderZ;
         
-        // Faster tracking speeds so they actively circle
+        // Fast, responsive tracking speeds to keep up with the fast-spinning targets
         const dx = hoverX - b.x;
         const dz = hoverZ - b.z;
         const distToTarget = Math.hypot(dx, dz);
         const speedMult = game.player.moving 
-          ? 1.25 
-          : distToTarget > 1.5 
-          ? 1.4 
+          ? 1.45 
+          : distToTarget > 2.0 
+          ? 1.35 
           : 1.15;
           
         moveToward3D(b, hoverX, hoverZ, sp * speedMult, dt);
@@ -5336,10 +5366,10 @@ function updateLumen(b, dt) {
     if (b.idleHover) {
       const idx = b.swarmIndex || 0;
       const p = b.idlePhase || 0;
-      // Form a helical shape vertically
-      const heightOffset = 0.9 + (idx % 3) * 0.35;
-      // Synergize bobbing speed with the active orbit
-      const uniqueBob = Math.sin(game.time * 3.5 + p) * 0.12;
+      // Form a helical shape vertically with gentle vertical waving
+      const heightOffset = 0.7 + ((idx * 3) % 5) * 0.35 + Math.cos(game.time * 0.9 + idx * 2.0) * 0.25;
+      // Dynamic bobbing speed and height variation
+      const uniqueBob = Math.sin(game.time * 2.0 + p) * 0.16;
       targetY = groundY + heightOffset + uniqueBob;
     } else {
       targetY = groundY + 1.2 + Math.sin(b.bob) * 0.3;
@@ -5941,7 +5971,8 @@ function updateBloom(dt) {
         x /= harvesting.length;
         z /= harvesting.length;
         if (spawnAbilityToken('beeFocus', x, z)) {
-          celest.chainReadyTimer = ABILITY_TOKEN_DEFS.beeFocus.life;
+          // The bee no longer glows immediately upon spawning the token.
+          // Triggering occurs only when the player walks into the token.
           game.bloomCooldown = T.bloom.cooldown;
           showTutorial('Celest Lumen formed a Celestial Link token between the flowers.');
         }
@@ -7640,6 +7671,8 @@ function updateHUD(dt) {
   checkQuestProgress();
   updateQuestUI();
 
+  updateActiveAbilitiesHUD();
+
   // Bloom bar
   const bl = game.bloom;
   const afterglow = game.bloomAfterglow;
@@ -7659,6 +7692,175 @@ function updateHUD(dt) {
     el.bloomFill.style.width = `${clamp(bl.timer/T.bloom.perTouchTime,0,1)*100}%`;
     el.bloomFill.style.background = 'var(--gold)';
   }
+}
+
+function getActiveAbilities() {
+  const list = [];
+
+  // 1. Celestial Link (Bloom Chain challenge)
+  const bl = game.bloom;
+  if (bl) {
+    if (!bl.started) {
+      list.push({
+        id: 'celestial_link_ready',
+        title: 'Celestial Link (Ready)',
+        iconHtml: '<img src="assets/celestial_link.png" class="active-ability-img-icon" alt="" />',
+        color: '#7fd8ff',
+        colorRGB: '127, 216, 255',
+        timer: bl.readyTimer,
+        maxTimer: T.bloom.readyTimeout,
+        desc: 'Celestial Link ready! Touch the starting bee to begin the chain challenge.'
+      });
+    } else {
+      list.push({
+        id: 'celestial_link_active',
+        title: 'Celestial Link (Active)',
+        iconHtml: '<img src="assets/celestial_link.png" class="active-ability-img-icon" alt="" />',
+        color: '#ffd700',
+        colorRGB: '255, 215, 0',
+        timer: bl.timer,
+        maxTimer: T.bloom.perTouchTime,
+        desc: 'Celestial Link active! Touch another glowing bee to extend the chain and reset the timer.'
+      });
+    }
+  }
+
+  // 2. Bloom Boost (Afterglow)
+  const afterglow = game.bloomAfterglow;
+  if (afterglow) {
+    list.push({
+      id: 'bloom_afterglow',
+      title: afterglow.perfect ? 'Perfect Bloom Boost' : 'Partial Bloom Boost',
+      iconHtml: `<img src="assets/celestial_link.png" class="active-ability-img-icon" style="filter: drop-shadow(0 0 2px ${afterglow.perfect ? '#ffe47a' : '#8fddff'}) hue-rotate(${afterglow.perfect ? '50deg' : '0deg'}) saturate(1.5);" alt="" />`,
+      color: afterglow.perfect ? '#ffe47a' : '#8fddff',
+      colorRGB: afterglow.perfect ? '255, 228, 122' : '143, 221, 255',
+      timer: afterglow.timer,
+      maxTimer: afterglow.duration,
+      desc: `Your bees have a ×${afterglow.multiplier.toFixed(1)} gathering speed multiplier boost!`
+    });
+  }
+
+  // 3. Royal Glow
+  if (game.tokenBuffs.royal > 0) {
+    list.push({
+      id: 'royal_glow',
+      title: 'Royal Glow',
+      iconHtml: '<img src="assets/basic_egg.png" class="active-ability-img-icon" style="filter: drop-shadow(0 0 2px #ff7a3a);" alt="" />',
+      color: '#ff7a3a',
+      colorRGB: '255, 122, 58',
+      timer: game.tokenBuffs.royal,
+      maxTimer: 45,
+      desc: 'Hatch odds for rare and legendary bees are dramatically boosted.'
+    });
+  }
+
+  // 4. Focus
+  if (game.tokenBuffs.focus > 0) {
+    list.push({
+      id: 'focus_buff',
+      title: 'Focus Buff',
+      iconHtml: `
+        <svg class="active-ability-svg-icon" viewBox="0 0 24 24" width="20" height="20" stroke="#28d7c5" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <circle cx="12" cy="12" r="6"></circle>
+          <circle cx="12" cy="12" r="2" fill="#28d7c5"></circle>
+        </svg>
+      `,
+      color: '#28d7c5',
+      colorRGB: '40, 215, 197',
+      timer: game.tokenBuffs.focus,
+      maxTimer: 20,
+      desc: 'Player and bee gather speed is increased by +25% and tool power is boosted.'
+    });
+  }
+
+  return list;
+}
+
+function updateActiveAbilitiesHUD() {
+  const container = document.getElementById('activeAbilities');
+  if (!container) return;
+
+  const active = getActiveAbilities();
+  
+  // Track IDs of currently displayed elements
+  const currentIds = new Set(active.map(a => a.id));
+
+  // Remove elements that are no longer active
+  Array.from(container.children).forEach(child => {
+    if (!currentIds.has(child.id)) {
+      // Fade out and remove
+      child.style.opacity = '0';
+      child.style.transform = 'translateY(10px)';
+      setTimeout(() => {
+        if (child.parentNode === container) {
+          container.removeChild(child);
+        }
+      }, 150);
+    }
+  });
+
+  // Create or update active abilities
+  active.forEach(ability => {
+    let itemEl = document.getElementById(ability.id);
+    if (!itemEl) {
+      // Create new ability element
+      itemEl = document.createElement('div');
+      itemEl.id = ability.id;
+      itemEl.className = 'active-ability-item';
+      itemEl.style.opacity = '0';
+      itemEl.style.transform = 'translateY(10px)';
+      
+      itemEl.innerHTML = `
+        <div class="active-ability-icon" style="color: ${ability.color}; border: 1px solid ${ability.color}40;">
+          ${ability.iconHtml}
+        </div>
+        <div class="active-ability-info">
+          <span class="active-ability-name">${ability.title}</span>
+          <div class="active-ability-bar-container">
+            <div class="active-ability-bar-fill" style="background-color: ${ability.color};"></div>
+          </div>
+        </div>
+        <div class="active-ability-tooltip">
+          <div class="active-ability-tooltip-title">${ability.title}</div>
+          <div class="active-ability-tooltip-desc">${ability.desc}</div>
+          <div class="active-ability-tooltip-time"></div>
+        </div>
+      `;
+      container.appendChild(itemEl);
+      
+      // Trigger entrance transition
+      requestAnimationFrame(() => {
+        itemEl.style.opacity = '1';
+        itemEl.style.transform = 'translateY(0)';
+      });
+    }
+
+    // Update existing elements
+    const ratio = Math.max(0, Math.min(1, ability.timer / ability.maxTimer));
+    const fillEl = itemEl.querySelector('.active-ability-bar-fill');
+    if (fillEl) {
+      fillEl.style.width = `${ratio * 100}%`;
+      // Dim fill opacity
+      fillEl.style.opacity = 0.3 + 0.7 * ratio;
+    }
+
+    // Update tooltip timer
+    const timeEl = itemEl.querySelector('.active-ability-tooltip-time');
+    if (timeEl) {
+      timeEl.textContent = `${ability.timer.toFixed(1)} seconds remaining`;
+    }
+
+    // Dim the color closer to finishing
+    const dim = 0.4 + 0.6 * ratio;
+    itemEl.style.opacity = itemEl.matches(':hover') ? '1.0' : String(dim);
+    itemEl.style.borderColor = `rgba(${ability.colorRGB}, ${0.1 + 0.5 * ratio})`;
+    
+    const iconEl = itemEl.querySelector('.active-ability-icon');
+    if (iconEl) {
+      iconEl.style.filter = `brightness(${0.6 + 0.4 * ratio})`;
+    }
+  });
 }
 
 function updateProximityUI() {
