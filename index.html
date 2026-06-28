@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Luminhive — 3D Bee Economy</title>
+<meta name="description" content="A cozy 3D bee world with a dangerous honey economy. Build your hive, command bee squads, and trade on the Honey Market." />
+<link rel="icon" type="image/png" href="./assets/basic_egg.png?v=37" />
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="css/style.css?v=30" />
+</head>
+<body>
+
+<!-- Three.js 3D Viewport -->
+<div id="gameContainer"></div>
+
+<!-- HUD Bar (top) -->
+<div id="hud" class="hud-bar">
+  <div class="hud-brand">
+    <span class="pulse-dot"></span>
+    <h1>LUMINHIVE <span>HIVE OPERATOR</span></h1>
+  </div>
+  <div class="hud-center-stats">
+    <div class="core-stat">
+      <span class="stat-tag">Honey flow</span>
+      <span id="hps" class="stat-value gold-text">0.0</span>
+    </div>
+    <div class="core-stat">
+      <span class="stat-tag">Honey Reserve</span>
+      <span id="honey" class="stat-value">0</span>
+    </div>
+    <div class="core-stat">
+      <span class="stat-tag">Pollen pack</span>
+      <span id="pollen" class="stat-value">0 / 100</span>
+      <div id="pollenBar"><div id="pollenFill"></div></div>
+    </div>
+    <div class="core-stat">
+      <span class="stat-tag">Bee Squad</span>
+      <span id="bees" class="stat-value green-text">0</span>
+    </div>
+  </div>
+  <div class="hud-right-stats">
+    <div class="core-stat">
+      <span class="stat-tag">Sky cycle</span>
+      <span id="clock" class="stat-value">DAY</span>
+    </div>
+    <div class="core-stat event-stat">
+      <span class="stat-tag">Current event</span>
+      <span id="currentEvent" class="stat-value">CALM SKIES</span>
+    </div>
+    <span id="swarmMode" class="swarm-badge mode-swarm">NEARBY</span>
+    <button id="soundBtn" class="sound-toggle-btn muted" title="Sound"><span id="soundIcon">🔇</span></button>
+  </div>
+</div>
+
+
+<!-- On-demand inventory — the egg button stays available during play -->
+<button id="inventoryToggle" class="inventory-toggle hidden" type="button" aria-controls="inventoryBar" aria-expanded="false" title="Open inventory (I)">
+  <img src="./assets/basic_egg.png?v=37" alt="" draggable="false" />
+  <b id="inventoryCount">0</b>
+</button>
+<aside id="inventoryBar" class="inventory-bar inventory-drawer hidden" aria-hidden="true">
+  <div class="inventory-drawer-head">
+    <div>
+      <span class="inventory-kicker">HIVE SATCHEL</span>
+      <strong class="satchel-title">Eggs & Collectibles</strong>
+    </div>
+    <button id="inventoryClose" class="panel-icon-btn" type="button" aria-label="Close inventory">&times;</button>
+  </div>
+  <div class="satchel-tabs" aria-label="Satchel categories">
+    <span class="active">Eggs</span>
+    <span>Items</span>
+    <span>Badges</span>
+  </div>
+  <div id="invItems" class="inv-items"></div>
+  <div class="inv-hint">Drag an egg onto your hive while standing near it. More collectibles will live here later.</div>
+</aside>
+
+<!-- Honey Shop Modal (walk up to the shop stall to open) -->
+<div id="shopModal" class="modal-screen hidden">
+  <div id="upgradePanel" class="modal-panel shop-modal-panel">
+    <div class="modal-header">
+      <div>
+        <h2>🛒 HONEY SHOP</h2>
+        <p>Spend honey on eggs, gear, and hive upgrades. Walk away from the stall to close.</p>
+      </div>
+      <div class="panel-actions">
+        <span id="refineryStatus" class="panel-status">OPEN</span>
+        <button class="panel-icon-btn modal-close" data-close="shopModal" type="button" aria-label="Close Shop">&times;</button>
+      </div>
+    </div>
+    <div class="dock-status-bar" id="dockStatusBar">
+      <span class="dock-status-dot"></span>
+      <span id="dockStatusText" class="dock-status-text">SHOP READY</span>
+    </div>
+    <div class="shop-tabs">
+      <button class="shop-tab active" data-tab="bees" type="button">🥚 BEES</button>
+      <button class="shop-tab" data-tab="gear" type="button">🎒 GEAR</button>
+      <button class="shop-tab" data-tab="hive" type="button">🏰 HIVE</button>
+    </div>
+    <div id="upgrades" class="upgrades-list shop-modal-list"></div>
+  </div>
+</div>
+
+<!-- Market Panel (right floating) -->
+<button id="marketOpenBtn" class="market-open-btn hidden" type="button" title="Open Honey Market" aria-label="Open Honey Market">HONEY MARKET</button>
+<div id="marketPanel" class="overlay-panel right-panel market-panel">
+  <div class="panel-header">
+    <h3>HONEY MARKET</h3>
+    <div class="panel-actions">
+      <span id="exchangeStatus" class="panel-status">STANDBY</span>
+      <button id="marketCloseBtn" class="panel-icon-btn" type="button" title="Close Honey Market" aria-label="Close Honey Market">&times;</button>
+    </div>
+  </div>
+  <div class="news-marquee">
+    <span id="newsText" class="marquee-content">Markets open. Beekeepers report calm skies over the Luminarium.</span>
+  </div>
+  <div class="trade-size-row">
+    <span class="trade-size-label">TRADE SIZE</span>
+    <div class="trade-size-btns" id="tradeSizeBtns">
+      <button class="ts-btn active" data-qty="1" type="button">×1</button>
+      <button class="ts-btn" data-qty="5" type="button">×5</button>
+      <button class="ts-btn" data-qty="25" type="button">×25</button>
+      <button class="ts-btn" data-qty="max" type="button">MAX</button>
+    </div>
+  </div>
+  <div class="market-balance-line">
+    <span>Available</span>
+    <b id="marketCash">0 honey</b>
+    <em>Fixed sizes require full honey; MAX uses what you can afford.</em>
+  </div>
+  <div id="mktList" class="market-list"></div>
+  <div class="market-networth">
+    <span>NET HIVE VALUE</span>
+    <span id="netWorth" class="val-gold">0</span>
+  </div>
+  <button id="fullMarketBtn" class="market-detail-btn" type="button">OPEN FULL MARKET</button>
+  <div class="speculator-card">
+    <h4>HONEY FORECAST</h4>
+    <p class="synth-desc">Risk in-game honey on a short forecast contract. Odds: 32% loss, 24% half, 24% small gain, 15% double, 5% jackpot.</p>
+    <div class="synth-inputs">
+      <button class="synth-bet-btn" data-pct="10">10%</button>
+      <button class="synth-bet-btn" data-pct="25">25%</button>
+      <button class="synth-bet-btn" data-pct="50">50%</button>
+      <input id="specBetInput" type="number" value="50" min="1" />
+    </div>
+    <div class="wheel-outer">
+      <div class="wheel-pointer">▼</div>
+      <div id="specWheel">
+        <div class="wheel-slice s-0">0×</div>
+        <div class="wheel-slice s-1">0.5×</div>
+        <div class="wheel-slice s-2">1.2×</div>
+        <div class="wheel-slice s-3">2×</div>
+        <div class="wheel-slice s-4">5×</div>
+      </div>
+    </div>
+    <button id="spinBtn" class="synth-spin-btn">RUN FORECAST</button>
+    <div id="specResult" class="synth-result">Choose honey risk to run a forecast.</div>
+  </div>
+</div>
+
+<!-- Egg hatch confirmation -->
+<div id="eggConfirmModal" class="modal-screen hidden">
+  <div class="modal-panel egg-confirm-panel">
+    <div class="modal-header">
+      <div>
+        <h2>HATCH EGG?</h2>
+        <p id="eggConfirmText">Hatch this egg into your hive?</p>
+      </div>
+      <button class="panel-icon-btn" id="eggConfirmNoTop" type="button" aria-label="Cancel hatch">&times;</button>
+    </div>
+    <div class="egg-confirm-body">
+      <img src="./assets/basic_egg.png?v=37" alt="" draggable="false" />
+      <div>
+        <strong id="eggConfirmName">Basic Egg</strong>
+        <span id="eggConfirmSlot">Next free hive slot</span>
+      </div>
+    </div>
+    <div class="egg-confirm-actions">
+      <button id="eggConfirmNo" class="modal-action-btn secondary" type="button">NO</button>
+      <button id="eggConfirmYes" class="modal-action-btn" type="button">YES, HATCH IT</button>
+    </div>
+  </div>
+</div>
+
+<!-- Perk Book Modal -->
+<div id="perkModal" class="modal-screen hidden">
+  <div class="modal-panel perk-panel">
+    <div class="modal-header">
+      <div>
+        <h2>PERK BOOK</h2>
+        <p>Permanent improvements with slow, rising honey costs.</p>
+      </div>
+      <button class="panel-icon-btn modal-close" data-close="perkModal" type="button" aria-label="Close Perk Book">&times;</button>
+    </div>
+    <div id="perkList" class="perk-list"></div>
+  </div>
+</div>
+
+<!-- Full Honey Market Modal -->
+<div id="fullMarketModal" class="modal-screen hidden">
+  <div class="modal-panel full-market-panel trading-terminal-panel">
+    <div class="modal-header">
+      <div>
+        <h2>📊 LUMINHIVE TRADING TERMINAL</h2>
+        <p>Invest only honey you have. Positions show invested value, current value, and gain or loss.</p>
+      </div>
+      <button class="panel-icon-btn modal-close" data-close="fullMarketModal" type="button" aria-label="Close Honey Market">&times;</button>
+    </div>
+    <div class="terminal-workspace">
+      <div id="terminalSidebar" class="terminal-sidebar"></div>
+      <div id="terminalMain" class="terminal-main"></div>
+    </div>
+    <div id="forecastLog" class="forecast-log"></div>
+  </div>
+</div>
+
+<!-- Interaction Prompt (center screen) -->
+<div id="interactPrompt" class="interact-prompt hidden">
+  <span id="promptText">Press E to claim hive</span>
+</div>
+
+<!-- Tutorial Toast -->
+<div id="tutorialToast" class="tutorial-toast hidden">
+  <span id="tutorialText"></span>
+</div>
+
+<!-- Bloom Chain Alert -->
+<div id="bloomBar" class="overlay-alert hidden">
+  <div id="bloomText">Bloom scan active</div>
+  <div id="bloomTrack"><div id="bloomFill"></div></div>
+</div>
+
+<!-- Controls stay tucked behind the bottom-right help button -->
+<button id="helpToggle" class="help-toggle hidden" type="button" aria-controls="controlsBar" aria-expanded="false" title="Controls (?)">?</button>
+<aside id="controlsBar" class="controls-bar controls-drawer hidden" aria-hidden="true">
+  <div class="controls-drawer-head">
+    <div>
+      <span class="inventory-kicker">FIELD GUIDE</span>
+      <strong>CONTROLS</strong>
+    </div>
+    <button id="helpClose" class="panel-icon-btn" type="button" aria-label="Close controls">&times;</button>
+  </div>
+  <div class="controls-grid">
+    <span><span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span> Move</span>
+    <span><span class="key">MOUSE</span> Camera / harvest</span>
+    <span><span class="key">E</span> Interact</span>
+    <span><span class="key">M</span> Market</span>
+    <span><span class="key">I</span> Inventory</span>
+    <span><span class="key">P</span> Perks</span>
+    <span><span class="key">H</span> Shop</span>
+    <span><span class="key-gold">SHIFT</span> Shift lock <span id="cameraMode" class="camera-mode-pill">FREE</span></span>
+    <span><span class="key">V</span> View <span id="cameraView" class="camera-mode-pill">3RD</span></span>
+  </div>
+  <p style="line-height: 1.4; margin-top: 10px; border-top: 1px dashed rgba(255,255,255,0.06); padding-top: 8px;">
+    <strong>Your bees follow you automatically:</strong><br>
+    • <span class="key-gold">NEARBY</span>: out in the open they hover around you.<br>
+    • <span class="key-gold">GATHERING</span>: step into a field and they fan out across it, banking pollen instantly as they work.
+  </p>
+</aside>
+
+<!-- Title / Start Screen -->
+<div id="title">
+  <div class="title-panel">
+    <div class="title-head">
+      <div class="glitch-txt">LUMINHIVE</div>
+      <div class="subtitle">A COZY BEE WORLD · A DANGEROUS HONEY ECONOMY</div>
+    </div>
+    <div class="instructions-grid">
+      <div class="inst-card">
+        <h5>① CLAIM A HIVE</h5>
+        <p>You spawn in the <b>apiary plaza</b> facing a row of hives. Walk to any vacant one and press <b>E</b> to claim it — the rest get taken by rival keepers.</p>
+      </div>
+      <div class="inst-card">
+        <h5>② WATCH IT HATCH</h5>
+        <p>Your first <b>bee</b> crawls out of its <b>honeycomb cell</b>. Bees live in the comb and pass through it to reach their slots.</p>
+      </div>
+      <div class="inst-card">
+        <h5>③ HARVEST & REFINE</h5>
+        <p>Hold the <b>left mouse button</b> near flowers, chase ability tokens, fill the pack, then return home to bank pollen as honey.</p>
+      </div>
+      <div class="inst-card">
+        <h5>④ GROW & UNLOCK</h5>
+        <p>Buy eggs, hatch bees into hex slots, unlock stronger fields by bee count, then use extra honey in the market.</p>
+      </div>
+    </div>
+    <button id="playBtn" class="enter-btn">ENTER THE SKYGARDEN</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="js/game.js?v=44"></script>
+</body>
+</html>

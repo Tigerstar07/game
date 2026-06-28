@@ -1,0 +1,8 @@
+.agents/
+.claude/
+.playwright-mcp/
+output/
+
+*.log
+*.png
+!assets/**/*.png
